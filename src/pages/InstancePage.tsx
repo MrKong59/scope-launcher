@@ -601,117 +601,19 @@ export function InstancePage({
       ? t("home.defaultName")
       : instance.name;
 
-  const resolveModListMetadata = useCallback(async (items: InstanceContent[]) => {
-    const normalizeIdentity = (value?: string | number) =>
-      String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-    const metadataByPath = new Map<
-      string,
-      {
-        projectName?: string;
-        projectUrl?: string;
-        projectVersion?: string;
-        source?: "modrinth" | "curseforge";
-      }
-    >();
-    await Promise.all(
-      items.map(async (item) => {
-        const identities = new Set(
-          [item.modName, ...(item.modIds || [])]
-            .map(normalizeIdentity)
-            .filter(Boolean),
-        );
-        const cachedMatchesJar =
-          !identities.size ||
-          [item.projectName, item.catalogProjectId]
-            .map(normalizeIdentity)
-            .some((identity) => identities.has(identity));
-
-        if (
-          item.projectName &&
-          item.projectUrl &&
-          item.projectVersion &&
-          cachedMatchesJar
-        ) {
-          metadataByPath.set(item.path, {
-            projectName: item.projectName,
-            projectUrl: item.projectUrl,
-            projectVersion: item.projectVersion,
-            source: item.source || "modrinth",
-          });
-          return;
-        }
-
-        if (!identities.size) return;
-
-        const searchSources: Array<"modrinth" | "curseforge"> = ["modrinth", "curseforge"];
-        for (const source of searchSources) {
-          try {
-            const query = item.modIds?.[0] || item.projectName || "";
-            const response = await window.onyx.catalog.search(query, "mod", {
-              source,
-              index: "relevance",
-              offset: 0,
-            });
-            const hit = response?.hits?.find((candidate) => {
-              const project = candidate as {
-                title?: string;
-                slug?: string;
-                project_id?: string;
-                curseforgeId?: number;
-              };
-              const hitIdentities = [
-                project.title,
-                project.slug,
-                project.project_id,
-                project.curseforgeId,
-              ]
-                .map(normalizeIdentity)
-                .filter(Boolean);
-              return hitIdentities.some((identity) => identities.has(identity));
-            }) as
-              | ({ title?: string; slug?: string; project_id?: string; curseforgeId?: number; source?: "modrinth" | "curseforge" } | undefined)
-              | null;
-            if (hit?.title && hit.slug) {
-              const projectUrl = source === "modrinth"
-                ? `https://modrinth.com/mod/${hit.slug}`
-                : `https://www.curseforge.com/minecraft/mc-mods/${hit.slug}`;
-              metadataByPath.set(item.path, {
-                projectName: hit.title,
-                projectUrl,
-                projectVersion:
-                  item.modVersion || item.projectVersion || item.update?.versionNumber,
-                source,
-              });
-              return;
-            }
-          } catch {
-            // Try the next source if this catalog query fails.
-          }
-        }
-
-        metadataByPath.set(item.path, {
-          projectName:
-            item.modName ||
-            item.name.replace(/\.(jar|disabled)$/i, "").replace(/\.disabled$/i, ""),
-          projectVersion:
-            item.modVersion ||
-            item.name.replace(/\.disabled$/i, "").replace(/\.jar$/i, ""),
-        });
-      }),
-    );
-
-    return items.map((item) => {
-      const metadata = metadataByPath.get(item.path);
-      if (!metadata) return item;
+  const resolveModListMetadata = useCallback((items: InstanceContent[]) =>
+    items.map((item) => {
+      const jarName = item.name
+        .replace(/\.disabled$/i, "")
+        .replace(/\.jar$/i, "");
       return {
         ...item,
-        source: metadata.source,
-        projectName: metadata.projectName || item.projectName || item.name,
-        projectUrl: metadata.projectUrl || item.projectUrl,
-        projectVersion: metadata.projectVersion || item.projectVersion,
+        projectName: item.projectName || item.modName || jarName,
+        projectVersion:
+          item.projectVersion || item.modVersion || item.update?.versionNumber || jarName,
       };
-    });
-  }, []);
+    }),
+  []);
 
   const buildModListText = useCallback(
     (items: InstanceContent[], format: "discord" | "plain" | "table") => {

@@ -30,6 +30,7 @@ const {
   checkModUpdates,
   listModHistory,
   readModMetadata,
+  removeModMetadata,
   rollbackModUpdate,
   updateMod,
   safeModrinthDownload,
@@ -2031,6 +2032,9 @@ function registerIpc() {
       throw new Error("The file is outside the instances directory");
     }
     await shell.trashItem(target);
+    if (/\.jar(?:\.disabled)?$/i.test(target)) {
+      await removeModMetadata(target);
+    }
     return true;
   });
   ipcMain.handle("instance:repair", async (_event, id) => {

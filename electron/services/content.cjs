@@ -53,7 +53,12 @@ function selectVersionFile(version) {
 }
 
 function metadataPathForFile(filePath) {
-  return `${filePath}.meta.json`;
+  const enabledPath = filePath.replace(/\.disabled$/i, "");
+  return `${enabledPath}.meta.json`;
+}
+
+async function removeModMetadata(filePath) {
+  await fsp.rm(metadataPathForFile(filePath), { force: true });
 }
 
 function looksLikeDisplayVersion(value) {
@@ -601,6 +606,7 @@ module.exports = {
   checkModUpdates,
   latestVersionForFile,
   readModMetadata,
+  removeModMetadata,
   safeModrinthDownload,
   updateMod,
   listModHistory,
